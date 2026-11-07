@@ -33,6 +33,11 @@ use Symfony\Component\TypeInfo\Type\UnionType;
 trait TypeFactoryTrait
 {
     /**
+     * @var array<string, true>
+     */
+    private static array $fromValueStack = [];
+
+    /**
      * @template T of TypeIdentifier
      * @template U value-of<T>
      *
@@ -432,7 +437,33 @@ trait TypeFactoryTrait
 
             foreach ($value as $k => $v) {
                 $keyTypes[] = self::fromValue($k);
-                $valueTypes[] = self::fromValue($v);
+
+                $id = match (true) {
+                    \is_object($v) => 'o'.spl_object_id($v),
+                    \is_array($v) && \is_array($value) && null !== $ref = \ReflectionReference::fromArrayElement($value, $k) => 'r'.$ref->getId(),
+                    default => null,
+                };
+
+                if (null === $id) {
+                    $valueTypes[] = self::fromValue($v);
+
+                    continue;
+                }
+
+                // do not descend into a value that is already being traversed (recursive structure)
+                if (isset(self::$fromValueStack[$id])) {
+                    $valueTypes[] = \is_array($v) ? self::array() : self::object($v::class);
+
+                    continue;
+                }
+
+                self::$fromValueStack[$id] = true;
+
+                try {
+                    $valueTypes[] = self::fromValue($v);
+                } finally {
+                    unset(self::$fromValueStack[$id]);
+                }
             }
 
             if ($keyTypes) {

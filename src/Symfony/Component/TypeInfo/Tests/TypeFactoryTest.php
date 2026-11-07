@@ -332,6 +332,15 @@ class TypeFactoryTest extends TestCase
         yield [Type::collection(Type::object(\ArrayIterator::class), Type::mixed(), Type::arrayKey()), new \ArrayIterator()];
         yield [Type::collection(Type::object(\Generator::class), Type::string(), Type::int()), (static fn (): iterable => yield 'string')()];
         yield [Type::collection(Type::object($arrayAccess::class)), $arrayAccess];
+
+        // recursive collection
+        $array = ['x' => 1];
+        $array['self'] = &$array;
+        yield [Type::dict(Type::union(Type::int(), Type::dict(Type::union(Type::int(), Type::array())))), $array];
+
+        $arrayObject = new \ArrayObject(['x' => 1]);
+        $arrayObject['self'] = $arrayObject;
+        yield [Type::collection(Type::object(\ArrayObject::class), Type::union(Type::int(), Type::collection(Type::object(\ArrayObject::class), Type::union(Type::int(), Type::object(\ArrayObject::class)), Type::string())), Type::string()), $arrayObject];
     }
 
     #[IgnoreDeprecations]
